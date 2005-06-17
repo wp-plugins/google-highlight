@@ -1,18 +1,14 @@
 <?php
 /*
 Plugin Name: Search Hilite
-Plugin URI: http://wordpress.org/#
+Plugin URI: http://dev.wp-plugins.org/file/google-highlight
 Description: When someone is referred from a search engine like Google, Yahoo, or WordPress' own, the terms they search for are highlighted with this plugin. Packaged by <a href="http://photomatt.net/">Matt</a>.
 Version: 1.2
 Author: Ryan Boren
 Author URI: http://boren.nu
 */ 
 
-/* Highlighting code c/o Ryan Boren */
 function get_search_query_terms($engine = 'google') {
-	$search = get_query_var('s');
-	$search_terms = get_query_var('search_terms');
-
 	$referer = urldecode($_SERVER['HTTP_REFERER']);
 	$query_array = array();
 	switch ($engine) {
@@ -35,67 +31,67 @@ function get_search_query_terms($engine = 'google') {
 		$query_terms = preg_replace('/\'|"/', '', $query_terms);
 		$query_array = preg_split ("/[\s,\+\.]+/", $query_terms);
 		break;
+		
+	case 'wordpress':
+		$search = get_query_var('s');
+		$search_terms = get_query_var('search_terms');
 
-    case 'wordpress':
-        // Check the search form vars if the search terms
-        // aren't in the referer.
-        if ( ! preg_match('/^.*s=/i', $referer)) {
-            if (!empty($search_terms)) {
-                $query_array = $search_terms;
-            } else if (isset($search)) {
-                $query_array = array($search);
-            }
-
-            break;
-        }
-
-		$query_terms = preg_replace('/^.*s=([^&]+)&?.*$/i','$1', $referer);
-		$query_terms = preg_replace('/\'|"/', '', $query_terms);
-		$query_array = preg_split ("/[\s,\+\.]+/", $query_terms);
-        break;
+		if (!empty($search_terms)) {
+			$query_array = $search_terms;
+		} else if (!empty($search)) {
+			$query_array = array($search);
+		} else {
+			$query_terms = preg_replace('/^.*s=([^&]+)&?.*$/i','$1', $referer);
+			$query_terms = preg_replace('/\'|"/', '', $query_terms);
+			$query_array = preg_split ("/[\s,\+\.]+/", $query_terms);
+		}
 	}
-
+	
 	return $query_array;
 }
 
 function is_referer_search_engine($engine = 'google') {
-	$siteurl = get_settings('home');
-    if( empty($_SERVER['HTTP_REFERER']) ) {
-        return 0;
-    }
+	if( empty($_SERVER['HTTP_REFERER']) && 'wordpress' != $engine ) {
+		return false;
+	}
+
 	$referer = urldecode($_SERVER['HTTP_REFERER']);
-    //echo "referer is: $referer<br />";
+
 	if ( ! $engine ) {
-		return 0;
+		return false;
 	}
 
 	switch ($engine) {
 	case 'google':
 		if (preg_match('|^http://(www)?\.?google.*|i', $referer)) {
-			return 1;
+			return true;
 		}
 		break;
 
-    case 'lycos':
+	case 'lycos':
 		if (preg_match('|^http://search\.lycos.*|i', $referer)) {
-			return 1;
+			return true;
 		}
-        break;
+		break;
 
-    case 'yahoo':
+	case 'yahoo':
 		if (preg_match('|^http://search\.yahoo.*|i', $referer)) {
-			return 1;
+			return true;
 		}
-        break;
+		break;
 
-    case 'wordpress':
-        if (preg_match("#^$siteurl#i", $referer)) {
-            return 1;
-        }
-        break;
+	case 'wordpress':
+		if ( is_search() )
+			return true;
+
+		$siteurl = get_option('home');
+		if (preg_match("#^$siteurl#i", $referer))
+			return true;
+
+		break;
 	}
 
-	return 0;
+	return false;
 }
 
 function hilite($text) {
@@ -134,6 +130,7 @@ function hilite_head() {
 
 // Highlight text and comments:
 add_filter('the_content', 'hilite');
+add_filter('the_excerpt', 'hilite');
 add_filter('comment_text', 'hilite');
 add_action('wp_head', 'hilite_head');
 
